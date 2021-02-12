@@ -24,7 +24,16 @@ TODO: both images talk to authz server that's not in the 'pod'
 
 ## Steps
 
-Run the `deploy.sh` script, ggiving it a git-repo-like directory. 
+First, build the projects:
+
+```bash
+$ mvn clean install
+```
+
+The install target will install the `faas-invoker` Docker image in the local Docker instance
+so it can be used as base by the `fake-fake-pipeline` to build the actual service image.
+
+Run the `deploy.sh` script, giving it a git-repo-like directory. 
 The directory must have a `manifest.yml` file.
 
 For the demo, use the provided `contact-functions-fake-repo` directory:
@@ -32,3 +41,9 @@ For the demo, use the provided `contact-functions-fake-repo` directory:
 ```bash
 $ ./deploy.sh contact-functions-fake-repo
 ```
+
+NOTE: The AuthZ server will have to be running. It is not launched by this process.
+This process is to launch the 'pod' that implements the FaaS functions. The envoy
+image (and also the service image, but that is optional) will communicate with
+the AuthZ server.
+
