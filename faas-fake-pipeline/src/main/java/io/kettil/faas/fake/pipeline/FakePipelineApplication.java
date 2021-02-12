@@ -74,6 +74,7 @@ public class FakePipelineApplication implements Callable<Integer> {
         }
 
         Path buildDirectory = Files.createTempDirectory("faas");
+        openVisualCode(buildDirectory); //TODO; comment out -- just a simple way to show the generated output
 
         Path serviceBuildDirectory = Files.createDirectory(buildDirectory.resolve("service"));
         log.info("Service build directory: {}", serviceBuildDirectory);
@@ -197,8 +198,22 @@ public class FakePipelineApplication implements Callable<Integer> {
             w.println("RUN chmod go+r /envoy.yaml");
             w.println("EXPOSE 18000");
             w.println("EXPOSE 8001");
-            w.println("CMD [\"/usr/local/bin/envoy\", \"-l\", \"debug\", \"-c\", \"/envoy.yaml\", \"--service-cluster\", \"front-proxy\"]");
+
+            //-l <string>,  --log-level <string>
+            //    Log levels: [trace][debug][info][warning
+            //    |warn][error][critical][off]
+
+            w.println("CMD [\"/usr/local/bin/envoy\", \"-l\", \"info\", \"-c\", \"/envoy.yaml\", \"--service-cluster\", \"front-proxy\"]");
         }
+    }
+
+    private int openVisualCode(Path dir) throws IOException {
+        CommandLine cmdLine = new CommandLine("code")
+            .addArgument(dir.toAbsolutePath().normalize().toString());
+
+        Executor executor = new DefaultExecutor();
+        executor.setWorkingDirectory(dir.toFile());
+        return executor.execute(cmdLine);
     }
 
     private int buildDockerImage(Path dir, String imageName) throws IOException {
