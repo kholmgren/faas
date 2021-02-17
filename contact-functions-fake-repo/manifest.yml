@@ -3,12 +3,16 @@ location: target/contact-functions-1.0.jar
 
 #TODO: env vars must be set at startup of container -- not implemented yet
 environment:
-  AUTHZ_HOST: "http://authz-host:18000"
+  AUTHZ_HOST: "http://authz_host:18000"
 
 authorization:
   extensions:
     namespace_service: api
     relation: viewer
+
+service_dependencies:
+  - authz_host
+  - contact_store
 
 paths:
   /create:
@@ -39,7 +43,9 @@ paths:
       objectid_ptr: /id
       extensions:
         namespace_object: contact
-        relation: editor
+        relation:
+          - editor
+          - publisher
 
 streams:
   - in_topic: source-events

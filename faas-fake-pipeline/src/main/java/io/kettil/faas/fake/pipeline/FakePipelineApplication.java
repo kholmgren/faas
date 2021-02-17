@@ -146,8 +146,8 @@ public class FakePipelineApplication implements Callable<Integer> {
             w.println("  envoy:");
             w.println("    image: contact-functions-envoy:latest");
             w.println("    extra_hosts:");
-            w.printf("      - \"authz-host:%s\"%n", dockerMachineIp);
-            w.printf("      - \"service-host:%s\"%n", dockerMachineIp);
+            w.printf("      - \"authz_host:%s\"%n", dockerMachineIp);
+            w.printf("      - \"service_host:%s\"%n", dockerMachineIp);
             w.println("    ports:");
             w.println("      - \"18000:18000\"");
             w.println("      - \"8001:8001\"");
@@ -161,7 +161,7 @@ public class FakePipelineApplication implements Callable<Integer> {
             }
 
             w.println("    extra_hosts:");
-            w.printf("      - \"authz-host:%s\"%n", dockerMachineIp);
+            w.printf("      - \"authz_host:%s\"%n", dockerMachineIp);
             w.println("    ports:");
             w.println("      - \"8002:8002\"");
         }
