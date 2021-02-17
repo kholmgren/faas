@@ -128,7 +128,7 @@ public class FakePipelineApplication implements Callable<Integer> {
             .map(i -> "-e " + i.getKey() + "=" + i.getValue())
             .collect(Collectors.joining(" "));
 
-        String dockerMachineIp = getDockerMachienIp();
+        String dockerMachineIp = getDockerMachineIp();
         Path dockerComposeFile = Path.of("docker-compose.yml");
         buildDockerComposeFile(manifest, dockerMachineIp, dockerComposeFile);
 
@@ -239,9 +239,6 @@ public class FakePipelineApplication implements Callable<Integer> {
         ObjectNode aclNode = (ObjectNode) routes.get(0);
 
         for (var i : manifest.getPaths().entrySet()) {
-            //TODO: we can direct envoy from the manifest here in the future
-            // i.getAuthz();
-
             ObjectNode route = servicePrototype.deepCopy();
 
             ObjectNode match = (ObjectNode) route.get("match");
@@ -278,7 +275,7 @@ public class FakePipelineApplication implements Callable<Integer> {
         return outputStream.toString();
     }
 
-    private String getDockerMachienIp() {
+    private String getDockerMachineIp() {
         Matcher matcher = Pattern.compile("inet\\s+([\\d.]+)")
             .matcher(run("ip addr show docker0"));
 
