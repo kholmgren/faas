@@ -238,7 +238,7 @@ public class FakePipelineApplication implements Callable<Integer> {
         ObjectNode servicePrototype = (ObjectNode) routes.remove(0);
         ObjectNode aclNode = (ObjectNode) routes.get(0);
 
-        for (var i : manifest.getPaths().entrySet()) {
+        for (Map.Entry<String, Manifest.PathManifest> i : manifest.getPaths().entrySet()) {
             ObjectNode route = servicePrototype.deepCopy();
 
             ObjectNode match = (ObjectNode) route.get("match");
@@ -254,7 +254,8 @@ public class FakePipelineApplication implements Callable<Integer> {
 
             LinkedHashMap<String, String> materializedExtensions = new LinkedHashMap<>(manifest.getAuthorization().getExtensions());
             materializedExtensions.putAll(i.getValue().getAuthorization().getExtensions());
-            for (var j : materializedExtensions.entrySet()) {
+
+            for (Map.Entry<String, String> j : materializedExtensions.entrySet()) {
                 contextExtensions.put(j.getKey(), j.getValue());
             }
 
