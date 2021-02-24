@@ -16,7 +16,7 @@ import java.io.File;
 
 @Slf4j
 @SpringBootApplication
-@PropertySource(ignoreResourceNotFound = false, value = "file:./faas-invoker.properties")
+@PropertySource(ignoreResourceNotFound = false, value = "file:./app/faas-invoker.properties")
 public class InvokerApplication {
     public static void main(String[] args) throws Exception {
         SpringApplication.run(InvokerApplication.class, args);

@@ -26,12 +26,21 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
+
+import static java.util.stream.Collectors.joining;
 
 @Slf4j
 @Data
 public class FakePipelineApplication implements Callable<Integer> {
-    @picocli.CommandLine.Option(names = {"-h", "--help"}, usageHelp = true, description = "display a help message")
+    private static final String INVOKER_BASE_IMAGE = "faas-invoker:latest";
+
+    private static final String ENVOY_BASE_IMAGE = "envoyproxy/envoy-dev:latest";
+
+    public static final String SERVICE_IMAGE_NAME_FORMAT = "%1$s-service:latest";
+
+    public static final String ENVOY_IMAGE_NAME_FORMAT = "%1$s-envoy:latest";
+
+    @picocli.CommandLine.Option(names = { "-h", "--help" }, usageHelp = true, description = "display a help message")
     private boolean helpRequested = false;
 
     @picocli.CommandLine.Parameters(index = "0", description = "Function repo dir")
@@ -57,8 +66,7 @@ public class FakePipelineApplication implements Callable<Integer> {
 
         log.info("Using manifest file {}", manifestPath);
 
-        Manifest manifest = yamlMapper
-            .readValue(manifestPath.toFile(), Manifest.class);
+        Manifest manifest = yamlMapper.readValue(manifestPath.toFile(), Manifest.class);
 
         Path artifact = manifestPath.getParent().resolve(manifest.getLocation());
         if (Files.notExists(artifact)) {
@@ -97,20 +105,24 @@ public class FakePipelineApplication implements Callable<Integer> {
         String propertiesFileName = "faas-invoker.properties";
         log.info("Creating {}", serviceSrcDirectory.resolve(propertiesFileName));
         try (PrintWriter w = new PrintWriter(serviceSrcDirectory.resolve(propertiesFileName).toFile())) {
-            w.printf("manifest=%s%n", manifestFileName);
-            w.printf("spring.cloud.function.location=%s%n", handlersJarFileName);
+            w.printf("manifest=/app/%s%n", manifestFileName);
+            w.printf("spring.cloud.function.location=/app/%s%n", handlersJarFileName);
 
             w.printf("spring.cloud.function.function-class=%s%n",
                 manifest.getPaths().values().stream()
                     .map(Manifest.PathManifest::getHandler)
-                    .collect(Collectors.joining(";")));
+                    .collect(joining(";")));
         }
 
         buildServiceDockerfile(serviceBuildDirectory, serviceSrcDirectory);
 
-        String serviceImageName = manifest.getName();
+        String serviceImageName = String.format(SERVICE_IMAGE_NAME_FORMAT, manifest.getName());
+
         log.info("Building service docker image {} using build dir {}", serviceImageName, serviceBuildDirectory);
         int exitCode = buildDockerImage(serviceBuildDirectory, serviceImageName);
+        if (exitCode != 0)
+            return exitCode;
+        exitCode = pushDockerImage(serviceImageName);
         if (exitCode != 0)
             return exitCode;
 
@@ -118,22 +130,30 @@ public class FakePipelineApplication implements Callable<Integer> {
         buildEnvoyConfig(manifest, envoyConfigFile.toFile());
         buildEnvoyDockerfile(envoyBuildDirectory, envoyConfigFile);
 
-        String envoyImageName = manifest.getName() + "-envoy";
+        String envoyImageName = String.format(ENVOY_IMAGE_NAME_FORMAT, manifest.getName());
         log.info("Building envoy docker image {} using build dir {}", envoyImageName, envoyBuildDirectory);
         exitCode = buildDockerImage(envoyBuildDirectory, envoyImageName);
+        if (exitCode != 0)
+            return exitCode;
+        exitCode = pushDockerImage(envoyImageName);
         if (exitCode != 0)
             return exitCode;
 
         String envArgs = manifest.getEnvironment().entrySet().stream()
             .map(i -> "-e " + i.getKey() + "=" + i.getValue())
-            .collect(Collectors.joining(" "));
+            .collect(joining(" "));
 
-        String dockerMachineIp = getDockerMachineIp();
+        String dockerMachineIp;
+        try {
+            dockerMachineIp = getDockerMachineIp();
+        } catch (Exception e) {
+            dockerMachineIp = getLocalMachineIp();
+        }
+
         Path dockerComposeFile = Path.of("docker-compose.yml");
         buildDockerComposeFile(manifest, dockerMachineIp, dockerComposeFile);
 
-        System.out.printf("%n%nTo start, run:%n  docker-compose -f %s up%n%n",
-            dockerComposeFile.toAbsolutePath().normalize());
+        System.out.printf("%n%nTo start, run:%n  docker-compose -f %s up%n%n", dockerComposeFile.toAbsolutePath().normalize());
 
         return 0;
     }
@@ -153,7 +173,7 @@ public class FakePipelineApplication implements Callable<Integer> {
             w.println("      - \"8001:8001\"");
             w.println();
             w.println("  service:");
-            w.println("    image: contact-functions:latest");
+            w.println("    image: contact-functions-service:latest");
             w.println("    environment:");
 
             for (Map.Entry<String, String> i : manifest.getEnvironment().entrySet()) {
@@ -168,9 +188,7 @@ public class FakePipelineApplication implements Callable<Integer> {
     }
 
     private int buildMvnProject(Path dir) throws IOException {
-        CommandLine cmdLine = new CommandLine("mvn")
-            .addArgument("clean")
-            .addArgument("package");
+        CommandLine cmdLine = new CommandLine("mvn").addArgument("clean").addArgument("package");
         DefaultExecutor executor = new DefaultExecutor();
         executor.setWorkingDirectory(dir.toFile());
         return executor.execute(cmdLine);
@@ -181,8 +199,8 @@ public class FakePipelineApplication implements Callable<Integer> {
         String dockerFileName = "Dockerfile";
         log.info("Creating {}", dockerFileName);
         try (PrintWriter w = new PrintWriter(buildDirectory.resolve(dockerFileName).toFile())) {
-            w.println("FROM faas-invoker:latest");
-            w.printf("COPY %1$s/* ./%n", srcDirectory.getFileName());
+            w.printf("FROM %s%n", INVOKER_BASE_IMAGE);
+            w.printf("COPY %1$s/* /app/%n", srcDirectory.getFileName());
         }
     }
 
@@ -191,25 +209,20 @@ public class FakePipelineApplication implements Callable<Integer> {
         String dockerFileName = "Dockerfile";
         log.info("Creating {}", dockerFileName);
         try (PrintWriter w = new PrintWriter(buildDirectory.resolve(dockerFileName).toFile())) {
-            w.println("FROM envoyproxy/envoy-dev:latest");
-            w.println("RUN apt-get update && apt-get -q install -y \\");
-            w.println("curl");
+            w.printf("FROM %s%n", ENVOY_BASE_IMAGE);
             w.printf("COPY ./%s /envoy.yaml%n", envoyConfigFile.getFileName()); //Using the 'yaml' extension instead of 'yml' is important
-            w.println("RUN chmod go+r /envoy.yaml");
-            w.println("EXPOSE 18000");
-            w.println("EXPOSE 8001");
 
-            //-l <string>,  --log-level <string>
-            //    Log levels: [trace][debug][info][warning
-            //    |warn][error][critical][off]
-
-            w.println("CMD [\"/usr/local/bin/envoy\", \"-l\", \"info\", \"-c\", \"/envoy.yaml\", \"--service-cluster\", \"front-proxy\"]");
+            //
+            //            //-l <string>,  --log-level <string>
+            //            //    Log levels: [trace][debug][info][warning
+            //            //    |warn][error][critical][off]
+            //
+            w.println("CMD [\"/usr/local/bin/envoy\", \"-l\", \"debug\", \"-c\", \"/envoy.yaml\", \"--service-cluster\", \"front-proxy\"]");
         }
     }
 
     private int openVisualCode(Path dir) throws IOException {
-        CommandLine cmdLine = new CommandLine("code")
-            .addArgument(dir.toAbsolutePath().normalize().toString());
+        CommandLine cmdLine = new CommandLine("code").addArgument(dir.toAbsolutePath().normalize().toString());
 
         Executor executor = new DefaultExecutor();
         executor.setWorkingDirectory(dir.toFile());
@@ -228,10 +241,16 @@ public class FakePipelineApplication implements Callable<Integer> {
         return executor.execute(cmdLine);
     }
 
+    private int pushDockerImage(String imageName) throws IOException {
+        CommandLine cmdLine = new CommandLine("docker").addArgument("push").addArgument(imageName);
+
+        Executor executor = new DefaultExecutor();
+        return executor.execute(cmdLine);
+    }
+
     @SneakyThrows
     private void buildEnvoyConfig(Manifest manifest, File envoyFile) {
-        ObjectNode envoy = yamlMapper
-            .readValue(getClass().getClassLoader().getResourceAsStream("envoy.yml"), ObjectNode.class);
+        ObjectNode envoy = yamlMapper.readValue(getClass().getClassLoader().getResourceAsStream("envoy.yml"), ObjectNode.class);
 
         ArrayNode routes = (ArrayNode) envoy.at("/static_resources/listeners/0/filter_chains/0/filters/0/typed_config/route_config/virtual_hosts/0/routes");
 
@@ -276,12 +295,17 @@ public class FakePipelineApplication implements Callable<Integer> {
         return outputStream.toString();
     }
 
-    private String getDockerMachineIp() {
-        Matcher matcher = Pattern.compile("inet\\s+([\\d.]+)")
-            .matcher(run("ip addr show docker0"));
+    public static final Pattern INET_PATTERN = Pattern.compile("inet\\s+([\\d.]+)");
 
-        return matcher.find()
-            ? matcher.group(1)
-            : null;
+    private String getDockerMachineIp() {
+        Matcher matcher = INET_PATTERN.matcher(run("ip addr show docker0")); //Ubuntu
+
+        return matcher.find() ? matcher.group(1) : null;
+    }
+
+    private String getLocalMachineIp() {
+        Matcher matcher = INET_PATTERN.matcher(run("ip addr show eth0")); //RHEL
+
+        return matcher.find() ? matcher.group(1) : null;
     }
 }
