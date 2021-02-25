@@ -32,15 +32,15 @@ import static java.util.stream.Collectors.joining;
 @Slf4j
 @Data
 public class FakePipelineApplication implements Callable<Integer> {
-    private static final String INVOKER_BASE_IMAGE = "faas-invoker:latest";
+    private static final String INVOKER_BASE_IMAGE = "kettil/faas-invoker:latest";
 
     private static final String ENVOY_BASE_IMAGE = "envoyproxy/envoy-dev:latest";
 
-    public static final String SERVICE_IMAGE_NAME_FORMAT = "%1$s-service:latest";
+    private static final String SERVICE_IMAGE_NAME_FORMAT = "kettil/%1$s-service:latest";
 
-    public static final String ENVOY_IMAGE_NAME_FORMAT = "%1$s-envoy:latest";
+    private static final String ENVOY_IMAGE_NAME_FORMAT = "kettil/%1$s-envoy:latest";
 
-    @picocli.CommandLine.Option(names = { "-h", "--help" }, usageHelp = true, description = "display a help message")
+    @picocli.CommandLine.Option(names = {"-h", "--help"}, usageHelp = true, description = "display a help message")
     private boolean helpRequested = false;
 
     @picocli.CommandLine.Parameters(index = "0", description = "Function repo dir")
@@ -242,7 +242,9 @@ public class FakePipelineApplication implements Callable<Integer> {
     }
 
     private int pushDockerImage(String imageName) throws IOException {
-        CommandLine cmdLine = new CommandLine("docker").addArgument("push").addArgument(imageName);
+        CommandLine cmdLine = new CommandLine("docker")
+            .addArgument("push")
+            .addArgument(imageName);
 
         Executor executor = new DefaultExecutor();
         return executor.execute(cmdLine);

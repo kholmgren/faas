@@ -123,10 +123,23 @@
                             <arguments>
                                 <argument>build</argument>
                                 <argument>-t</argument>
-                                <argument>${project.artifactId}:${project.version}</argument>
-                                <argument>-t</argument>
-                                <argument>${project.artifactId}:latest</argument>
+                                <argument>kettil/${project.artifactId}:latest</argument>
                                 <argument>.</argument>
+                            </arguments>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>docker-push</id>
+                        <phase>install</phase>
+                        <goals>
+                            <goal>exec</goal>
+                        </goals>
+                        <configuration>
+                            <executable>docker</executable>
+                            <workingDirectory>${project.basedir}</workingDirectory>
+                            <arguments>
+                                <argument>push</argument>
+                                <argument>kettil/${project.artifactId}:latest</argument>
                             </arguments>
                         </configuration>
                     </execution>
