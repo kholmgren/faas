@@ -10,9 +10,9 @@ authorization:
     namespace_service: api
     relation: viewer
 
-service_dependencies:
-  - authz_host
-  - contact_store
+#service_dependencies:
+#  - authz_host
+#  - contact_store
 
 paths:
   /create:
@@ -43,9 +43,7 @@ paths:
       objectid_ptr: /id
       extensions:
         namespace_object: contact
-        relation:
-          - editor
-          - publisher
+        relation: editor
 
 streams:
   - in_topic: source-events
