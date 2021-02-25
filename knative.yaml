@@ -1,0 +1,62 @@
+---
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: contact-functions
+  namespace: default
+spec:
+  template:
+    spec:
+      containers:
+        - name: front-envoy
+          image: kettil/contact-functions-envoy
+          ports:
+            - containerPort: 18000
+            - containerPort: 8001
+        - name: service1
+          image: kettil/contact-functions-service
+          ports:
+            - containerPort: 8002
+---
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: auth
+  namespace: default
+spec:
+  template:
+    spec:
+      containers:
+        - name: authz
+          image: kettil/kram-auth
+          env:
+            - name: SPRING_PROFILES_ACTIVE
+              value: docker
+          ports:
+            - containerPort: 8080
+            - containerPort: 8081
+---
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: redis
+  namespace: default
+spec:
+  template:
+    spec:
+      containers:
+        - name: redis
+          image: bitnami/redis
+          ports:
+            - containerPort: 6379
+          env:
+            - name: ALLOW_EMPTY_PASSWORD
+              value: 'yes'
+            - name: REDIS_DISABLE_COMMANDS
+              value: FLUSHDB,FLUSHALL
+          volumeMounts:
+            - name: redis-data
+              mountPath: /bitnami/redis
+      volumes:
+        - name: redis-data
+          emptyDir: {}

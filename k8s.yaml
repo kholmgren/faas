@@ -1,0 +1,155 @@
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: contact-functions
+  labels:
+    app: contact-functions
+spec:
+  ports:
+    - name: front-proxy-ingress
+      port: 18000
+      targetPort: 18000
+      protocol: TCP
+    - name: front-proxy-tbd
+      port: 8001
+      targetPort: 8001
+      protocol: TCP
+    - name: service1-ingress
+      port: 9002
+      targetPort: 8002
+      protocol: TCP
+  selector:
+    app: contact-functions
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: contact-functions
+spec:
+  selector:
+    matchLabels:
+      app: contact-functions
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: contact-functions
+    spec:
+      containers:
+        - name: front-proxy
+          image: kettil/contact-functions-envoy
+          ports:
+            - containerPort: 18000
+            - containerPort: 8001
+        - name: service1
+          image: kettil/contact-functions-service
+          ports:
+            - containerPort: 8002
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: authz
+  labels:
+    app: authz
+spec:
+  ports:
+    - name: remote-authz
+      port: 8080
+      targetPort: 8080
+      protocol: TCP
+    - name: authz-control
+      port: 8081
+      targetPort: 8081
+      protocol: TCP
+  selector:
+    app: authz
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: authz
+spec:
+  selector:
+    matchLabels:
+      app: authz
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: authz
+    spec:
+      containers:
+        - name: authz
+          image: kettil/kram-auth
+          env:
+            - name: SPRING_PROFILES_ACTIVE
+              value: docker
+          ports:
+            - containerPort: 18000
+            - containerPort: 8001
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis
+  labels:
+    app: redis
+spec:
+  ports:
+    - name: redis
+      port: 6379
+      targetPort: 6379
+      protocol: TCP
+  selector:
+    app: redis
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis
+spec:
+  selector:
+    matchLabels:
+      app: redis
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: redis
+    spec:
+      containers:
+        - name: redis
+          image: bitnami/redis
+          ports:
+            - containerPort: 6379
+          env:
+            - name: ALLOW_EMPTY_PASSWORD
+              value: 'yes'
+            - name: REDIS_DISABLE_COMMANDS
+              value: FLUSHDB,FLUSHALL
+          volumeMounts:
+            - name: redis-data
+              mountPath: /bitnami/redis
+      volumes:
+        - name: redis-data
+          emptyDir: {}
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: minimal-ingress
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+spec:
+  rules:
+    - http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: contact-functions
+                port:
+                  number: 9002
