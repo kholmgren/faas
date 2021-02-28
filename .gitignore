@@ -72,3 +72,5 @@ fabric.properties
 
 .idea
 dependency-reduced-pom.xml
+
+/knative/istio-1.9.0/

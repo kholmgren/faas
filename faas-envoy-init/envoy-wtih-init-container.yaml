@@ -1,0 +1,98 @@
+---
+kind: Pod
+apiVersion: v1
+metadata:
+  name: envoy
+  labels:
+    app: envoy
+spec:
+  volumes:
+    - name: faas-manifest-config
+      configMap:
+        name: faas-manifest-config
+    - name: faas-envoy-config
+      emptyDir: {}
+  containers:
+    - name: envoy
+      image: docker.io/envoyproxy/envoy-alpine:v1.16.2
+      ports:
+        - name: http
+          containerPort: 10000
+          protocol: TCP
+      resources: { }
+      volumeMounts:
+        - name: faas-envoy-config
+          mountPath: /etc/envoy
+  initContainers:
+    - name: envoy-init
+      image: docker.io/kettil/faas-envoy-init
+      env:
+        - name: MANIFEST_FILE
+          value: /etc/faas/manifest.yaml
+        - name: ENVOY_CONFIG_FILE
+          value: /etc/envoy/envoy.yaml
+      volumeMounts:
+        - name: faas-manifest-config
+          mountPath: /etc/faas
+        - name: faas-envoy-config
+          mountPath: /etc/envoy
+
+---
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: faas-manifest-config
+data:
+  manifest.yaml: |
+    name: contact-functions
+    location: target/contact-functions-1.0.jar
+
+    #TODO: env vars must be set at startup of container -- not implemented yet
+    environment:
+      AUTHZ_HOST: "http://authz:18000"
+
+    authorization:
+      extensions:
+        namespace_service: api
+        relation: viewer
+
+    #service_dependencies:
+    #  - authz
+    #  - contact_store
+
+    paths:
+      /create:
+        handler: contacts.functions.create.CreateContact
+        authorization:
+          extensions:
+            namespace_object: contact
+            relation: owner
+
+      /delete:
+        handler: contacts.functions.delete.DeleteContact
+        authorization:
+          objectid_ptr: /id
+          extensions:
+            namespace_object: contact
+            relation: owner
+
+      /read:
+        handler: contacts.functions.read.ReadContact
+        authorization:
+          objectid_ptr: /id
+          extensions:
+            namespace_object: contact
+
+      /update:
+        handler: contacts.functions.update.UpdateContact
+        authorization:
+          objectid_ptr: /id
+          extensions:
+            namespace_object: contact
+            relation: editor
+
+    streams:
+      - in_topic: source-events
+        in_group: derp-group
+        out_topic: derped-events
+        handler: contacts.functions.create.UpdateContact

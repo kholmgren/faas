@@ -11,6 +11,7 @@
     <modules>
         <module>faas-api</module>
         <module>faas-invoker</module>
+        <module>faas-envoy-init</module>
         <module>faas-fake-pipeline</module>
     </modules>
 </project>
