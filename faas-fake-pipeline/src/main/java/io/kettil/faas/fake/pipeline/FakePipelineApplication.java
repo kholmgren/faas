@@ -102,17 +102,17 @@ public class FakePipelineApplication implements Callable<Integer> {
         Files.copy(manifestPath, serviceSrcDirectory.resolve(manifestFileName));
         log.info("Copied {} to {}", manifestPath, serviceSrcDirectory.resolve(manifestFileName));
 
-        String propertiesFileName = "faas-invoker.properties";
-        log.info("Creating {}", serviceSrcDirectory.resolve(propertiesFileName));
-        try (PrintWriter w = new PrintWriter(serviceSrcDirectory.resolve(propertiesFileName).toFile())) {
-            w.printf("manifest=/app/%s%n", manifestFileName);
-            w.printf("spring.cloud.function.location=/app/%s%n", handlersJarFileName);
-
-            w.printf("spring.cloud.function.function-class=%s%n",
-                manifest.getPaths().values().stream()
-                    .map(Manifest.PathManifest::getHandler)
-                    .collect(joining(";")));
-        }
+//        String propertiesFileName = "faas-invoker.properties";
+//        log.info("Creating {}", serviceSrcDirectory.resolve(propertiesFileName));
+//        try (PrintWriter w = new PrintWriter(serviceSrcDirectory.resolve(propertiesFileName).toFile())) {
+//            w.printf("manifest=/app/%s%n", manifestFileName);
+//            w.printf("spring.cloud.function.location=/app/%s%n", handlersJarFileName);
+//
+//            w.printf("spring.cloud.function.function-class=%s%n",
+//                manifest.getPaths().values().stream()
+//                    .map(Manifest.PathManifest::getHandler)
+//                    .collect(joining(";")));
+//        }
 
         buildServiceDockerfile(serviceBuildDirectory, serviceSrcDirectory);
 
@@ -200,7 +200,7 @@ public class FakePipelineApplication implements Callable<Integer> {
         log.info("Creating {}", dockerFileName);
         try (PrintWriter w = new PrintWriter(buildDirectory.resolve(dockerFileName).toFile())) {
             w.printf("FROM %s%n", INVOKER_BASE_IMAGE);
-            w.printf("COPY %1$s/* /app/%n", srcDirectory.getFileName());
+            w.printf("COPY %1$s/* /%n", srcDirectory.getFileName());
         }
     }
 

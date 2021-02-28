@@ -16,21 +16,20 @@ import java.io.File;
 
 @Slf4j
 @SpringBootApplication
-@PropertySource(ignoreResourceNotFound = false, value = "file:./app/faas-invoker.properties")
 public class InvokerApplication {
     public static void main(String[] args) throws Exception {
         SpringApplication.run(InvokerApplication.class, args);
     }
 
+    public static ObjectMapper yamlMapper(){
+        return new ObjectMapper(new YAMLFactory())
+                .findAndRegisterModules()
+                .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+    }
+
     @SneakyThrows
     @Bean
     public Manifest manifest(@Value("${manifest}") String manifestLocation) {
-        ObjectMapper mapper = new ObjectMapper(new YAMLFactory())
-            .findAndRegisterModules()
-            .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
-
-        Manifest manifest = mapper.readValue(new File(manifestLocation), Manifest.class);
-
-        return manifest;
+        return yamlMapper().readValue(new File(manifestLocation), Manifest.class);
     }
 }

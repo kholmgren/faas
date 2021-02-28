@@ -1,0 +1,85 @@
+---
+kind: Pod
+apiVersion: v1
+metadata:
+  name: contact-functions-service
+  labels:
+    app: contact-functions-service
+spec:
+  volumes:
+    - name: faas-manifest-config
+      configMap:
+        name: faas-manifest-config
+  containers:
+    - name: contact-functions-service
+      image:  docker.io/kettil/contact-functions-service:latest
+      env:
+        - name: PORT
+          value: '8003'
+      ports:
+        - name: http
+          containerPort: 8003
+          protocol: TCP
+      volumeMounts:
+        - name: faas-manifest-config
+          mountPath: /etc/faas
+
+---
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: faas-manifest-config
+data:
+  manifest.yaml: |
+    name: contact-functions
+    location: target/contact-functions-1.0.jar
+
+    #TODO: env vars must be set at startup of container -- not implemented yet
+    environment:
+      AUTHZ_HOST: "http://authz:18000"
+
+    authorization:
+      extensions:
+        namespace_service: api
+        relation: viewer
+
+    #service_dependencies:
+    #  - authz
+    #  - contact_store
+
+    paths:
+      /create:
+        handler: contacts.functions.create.CreateContact
+        authorization:
+          extensions:
+            namespace_object: contact
+            relation: owner
+
+      /delete:
+        handler: contacts.functions.delete.DeleteContact
+        authorization:
+          objectid_ptr: /id
+          extensions:
+            namespace_object: contact
+            relation: owner
+
+      /read:
+        handler: contacts.functions.read.ReadContact
+        authorization:
+          objectid_ptr: /id
+          extensions:
+            namespace_object: contact
+
+      /update:
+        handler: contacts.functions.update.UpdateContact
+        authorization:
+          objectid_ptr: /id
+          extensions:
+            namespace_object: contact
+            relation: editor
+
+    streams:
+      - in_topic: source-events
+        in_group: derp-group
+        out_topic: derped-events
+        handler: contacts.functions.create.UpdateContact
